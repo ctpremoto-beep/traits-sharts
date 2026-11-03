@@ -9,10 +9,10 @@ textarea{width:100%;height:160px;background:#111;color:#0f9;font-size:11px}label
 <fieldset><legend>Edit</legend><label>Active template <select id=act></select></label>
 <label>Opacity <input type=range id=op min=0 max=1 step=.05 value=.6></label>
 <label><input type=checkbox id=sg checked> Show mesh grid</label><label><input type=checkbox id=sp checked> Show pins</label>
-<button id=rs>Reset active</button><button id=ra>Reset all</button></fieldset>
+<button id=rs>Reset active</button><button id=ro>Reset outlines</button><button id=ra>Reset all</button></fieldset>
 <fieldset><legend>Save</legend><button id=sv>Save + download placements.json</button><button id=cp>Copy JSON</button>
 <button id=ld>Load JSON</button><input type=file id=lf accept=.json,application/json hidden><textarea id=tx placeholder="JSON appears here; paste JSON here then Load JSON (or pick a file)"></textarea><div id=msg style=color:#00EC97></div></fieldset>
-<p style=color:#aaa;font-size:13px>Drag the white mesh points to warp the active template; drag the labeled pins to mark spots. Works with mouse and touch.</p></div></div>
+<p style=color:#aaa;font-size:13px>Drag the white mesh points to warp the active template; drag the labeled pins to mark spots. Outlines: drag points; double-click an edge to add a point; right-click or long-press a point to remove it. Works with mouse and touch.</p></div></div>
 <script>
 const N=5,S=1254,cv=document.getElementById('c'),g=cv.getContext('2d'),$=i=>document.getElementById(i);
 function mk(w,h,f){const c=document.createElement('canvas');c.width=w;c.height=h;f(c.getContext('2d'));return c}
@@ -23,10 +23,11 @@ function img(s){const i=new Image();i.src=s;i.onload=draw;return i}
 const T=[{id:'sample_hat',src:hatT,r:[280,0,1040,430],on:true},{id:'sample_shirt',src:shirtT,r:[0,694,1254,1254],on:true},
 {id:'hat_neon_beanie',src:img('samples/hat_neon_beanie.png'),r:[0,0,S,S],on:false},{id:'shirt_techwear_jacket',src:img('samples/shirt_techwear_jacket.png'),r:[0,0,S,S],on:false}];
 const PD={neck_left:[600,800],neck_right:[1000,800],neck_front:[990,760],neck_back:[600,740],shoulder_left:[300,950],shoulder_right:[1080,950],arm_front:[1150,1150],arm_back:[150,1150],necklace_center:[960,1000],chin:[950,770],hat_brim_front:[1020,410],hat_back:[330,370],head_top:[660,40],eye:[870,470]};
+const OD={head_outline:[[661, 40], [607, 75], [525, 92], [447, 122], [420, 164], [370, 214], [311, 264], [274, 322], [261, 379], [244, 447], [264, 481], [259, 534], [236, 603], [256, 652], [240, 710], [359, 729], [554, 729], [749, 729], [945, 729], [1038, 623], [1065, 525], [1054, 451], [1048, 367], [1013, 296], [969, 249], [904, 184], [839, 131], [765, 99]],body_outline:[[232, 730], [209, 778], [141, 821], [94, 864], [80, 912], [46, 953], [0, 1063], [22, 1176], [38, 1221], [89, 1229], [211, 1253], [388, 1253], [564, 1253], [741, 1253], [918, 1253], [1095, 1253], [1194, 1220], [1159, 1139], [1114, 1085], [1083, 1040], [1013, 1001], [950, 964], [891, 910], [864, 843], [924, 844], [992, 793], [939, 730], [762, 730], [585, 730], [409, 730]]},OC={head_outline:'#00EC97',body_outline:'#ffb000'};
 const base=img('base.png');let st,act=0,drag=null;
 function grid(r){const p=[];for(let j=0;j<N;j++)for(let i=0;i<N;i++)p.push([r[0]+(r[2]-r[0])*i/(N-1),r[1]+(r[3]-r[1])*j/(N-1)]);return p}
-function fresh(){return{opacity:.6,templates:Object.fromEntries(T.map(t=>[t.id,{on:t.on,mesh:grid(t.r)}])),pins:JSON.parse(JSON.stringify(PD))}}
-st=JSON.parse(localStorage.getItem('morph_state')||'null')||fresh();
+function fresh(){return{opacity:.6,templates:Object.fromEntries(T.map(t=>[t.id,{on:t.on,mesh:grid(t.r)}])),pins:JSON.parse(JSON.stringify(PD)),outlines:JSON.parse(JSON.stringify(OD)),olOn:{head_outline:true,body_outline:true}}}
+st=JSON.parse(localStorage.getItem('morph_state')||'null')||fresh();if(!st.outlines)st.outlines=JSON.parse(JSON.stringify(OD));if(!st.olOn)st.olOn={head_outline:true,body_outline:true};T.forEach(t=>{if(!st.templates[t.id])st.templates[t.id]={on:t.on,mesh:grid(t.r)}});for(const k in PD)if(!st.pins[k])st.pins[k]=PD[k].slice();
 function sw(t){return t.src.naturalWidth||t.src.width}function sh(t){return t.src.naturalHeight||t.src.height}
 function tri(im,s,d){const[x0,y0]=s[0],[x1,y1]=s[1],[x2,y2]=s[2],D=(x1-x0)*(y2-y0)-(x2-x0)*(y1-y0);if(!D)return;
  const cx=(d[0][0]+d[1][0]+d[2][0])/3,cy=(d[0][1]+d[1][1]+d[2][1])/3,e=d.map(p=>{const dx=p[0]-cx,dy=p[1]-cy,l=Math.hypot(dx,dy)||1;return[p[0]+dx/l*.8,p[1]+dy/l*.8]});
@@ -39,27 +40,39 @@ function draw(){g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,S,S);if(base.complet
   for(let j=0;j<N-1;j++)for(let i=0;i<N-1;i++){tri(t.src,[sp(i,j),sp(i+1,j),sp(i,j+1)],[P(i,j),P(i+1,j),P(i,j+1)]);tri(t.src,[sp(i+1,j),sp(i+1,j+1),sp(i,j+1)],[P(i+1,j),P(i+1,j+1),P(i,j+1)])}
   g.globalAlpha=1;if($('sg').checked&&k==act){g.strokeStyle='#fff';g.lineWidth=2;for(let j=0;j<N;j++)for(let i=0;i<N;i++){const p=P(i,j);if(i<N-1){g.beginPath();g.moveTo(...p);g.lineTo(...P(i+1,j));g.stroke()}if(j<N-1){g.beginPath();g.moveTo(...p);g.lineTo(...P(i,j+1));g.stroke()}}
    m.mesh.forEach(p=>{g.fillStyle='#fff';g.beginPath();g.arc(p[0],p[1],11,0,7);g.fill();g.strokeStyle='#000';g.stroke()})}});
+ for(const k in st.outlines){if(!st.olOn[k])continue;const P=st.outlines[k];g.beginPath();P.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.globalAlpha=st.opacity*.45;g.fillStyle=OC[k];g.fill();g.globalAlpha=1;g.lineWidth=3;g.strokeStyle=OC[k];g.stroke();
+  P.forEach(p=>{g.fillStyle=OC[k];g.beginPath();g.arc(p[0],p[1],9,0,7);g.fill();g.strokeStyle='#000';g.lineWidth=2;g.stroke()});g.font='bold 24px sans-serif';g.fillStyle=OC[k];g.fillText(k,P[0][0]+12,P[0][1]+30)}
  if($('sp').checked)for(const[n,p]of Object.entries(st.pins)){g.fillStyle='#ff2d6f';g.beginPath();g.arc(p[0],p[1],10,0,7);g.fill();g.strokeStyle='#fff';g.lineWidth=3;g.stroke();
   g.font='bold 22px sans-serif';g.lineWidth=5;g.strokeStyle='#000';g.strokeText(n,p[0]+13,p[1]-8);g.fillStyle='#fff';g.fillText(n,p[0]+13,p[1]-8)}}
 function pos(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*S/r.width,(e.clientY-r.top)*S/r.height]}
 cv.addEventListener('pointerdown',e=>{const q=pos(e),R=40,d=p=>Math.hypot(p[0]-q[0],p[1]-q[1]);let best=null,bd=R;
+ for(const k in st.outlines){if(!st.olOn[k])continue;const P=st.outlines[k];g.beginPath();P.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.globalAlpha=st.opacity*.45;g.fillStyle=OC[k];g.fill();g.globalAlpha=1;g.lineWidth=3;g.strokeStyle=OC[k];g.stroke();
+  P.forEach(p=>{g.fillStyle=OC[k];g.beginPath();g.arc(p[0],p[1],9,0,7);g.fill();g.strokeStyle='#000';g.lineWidth=2;g.stroke()});g.font='bold 24px sans-serif';g.fillStyle=OC[k];g.fillText(k,P[0][0]+12,P[0][1]+30)}
  if($('sp').checked)for(const[n,p]of Object.entries(st.pins))if(d(p)<bd){bd=d(p);best=p}
  const m=st.templates[T[act].id];if($('sg').checked&&m.on)m.mesh.forEach(p=>{if(d(p)<bd){bd=d(p);best=p}});
+ let ol=null;for(const k in st.outlines)if(st.olOn[k])st.outlines[k].forEach((p,i)=>{if(d(p)<bd){bd=d(p);best=p;ol=[k,i]}});
+ if(ol&&!best.__){lp=setTimeout(()=>{rem(ol[0],best);drag=null},650);lp0=q}
  if(best){drag=best;cv.setPointerCapture(e.pointerId);e.preventDefault()}});
-cv.addEventListener('pointermove',e=>{if(!drag)return;const q=pos(e);drag[0]=Math.round(q[0]);drag[1]=Math.round(q[1]);draw()});
-const up=()=>{if(drag){drag=null;persist()}};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+cv.addEventListener('pointermove',e=>{if(!drag)return;const q=pos(e);if(lp&&Math.hypot(q[0]-lp0[0],q[1]-lp0[1])>8){clearTimeout(lp);lp=null}drag[0]=Math.round(q[0]);drag[1]=Math.round(q[1]);draw()});
+const up=()=>{clearTimeout(lp);lp=null;if(drag){drag=null;persist()}};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+let lp=null,lp0=null;
+function rem(k,p){const P=st.outlines[k];if(P.length<=3)return;const i=P.indexOf(p);if(i>=0){P.splice(i,1);persist();draw()}}
+cv.addEventListener('contextmenu',e=>{e.preventDefault();const q=pos(e);for(const k in st.outlines){if(!st.olOn[k])continue;const p=st.outlines[k].find(p=>Math.hypot(p[0]-q[0],p[1]-q[1])<30);if(p){rem(k,p);return}}});
+cv.addEventListener('dblclick',e=>{const q=pos(e);let b=null,bd=40;for(const k in st.outlines){if(!st.olOn[k])continue;const P=st.outlines[k];P.forEach((a,i)=>{const c=P[(i+1)%P.length],dx=c[0]-a[0],dy=c[1]-a[1],t=Math.max(0,Math.min(1,((q[0]-a[0])*dx+(q[1]-a[1])*dy)/(dx*dx+dy*dy||1))),dd=Math.hypot(a[0]+t*dx-q[0],a[1]+t*dy-q[1]);if(dd<bd){bd=dd;b=[k,i+1]}})}
+ if(b){st.outlines[b[0]].splice(b[1],0,[Math.round(q[0]),Math.round(q[1])]);persist();draw()}});
 function persist(){localStorage.setItem('morph_state',JSON.stringify(st))}
-function json(){return JSON.stringify({units:'base pixels (1254x1254)',grid:N+'x'+N+' row-major, top-left first',opacity:st.opacity,templates:st.templates,pins:st.pins},null,1)}
-function ui(){$('tl').innerHTML=T.map(t=>`<label><input type=checkbox data-t=${t.id} ${st.templates[t.id].on?'checked':''}> ${t.id}</label>`).join('');
+function json(){return JSON.stringify({units:'base pixels (1254x1254)',grid:N+'x'+N+' row-major, top-left first',opacity:st.opacity,templates:st.templates,pins:st.pins,head_outline:st.outlines.head_outline,body_outline:st.outlines.body_outline},null,1)}
+function ui(){$('tl').innerHTML=T.map(t=>`<label><input type=checkbox data-t=${t.id} ${st.templates[t.id].on?'checked':''}> ${t.id}</label>`).join('')+['head_outline','body_outline'].map(k=>`<label><input type=checkbox data-o=${k} ${st.olOn[k]?'checked':''}> ${k.replace('_',' ')} (polygon)</label>`).join('');document.querySelectorAll('[data-o]').forEach(c=>c.onchange=()=>{st.olOn[c.dataset.o]=c.checked;persist();draw()});
  $('act').innerHTML=T.map((t,i)=>`<option value=${i}>${t.id}</option>`).join('');$('act').value=act;$('op').value=st.opacity;
  document.querySelectorAll('[data-t]').forEach(c=>c.onchange=()=>{st.templates[c.dataset.t].on=c.checked;persist();draw()})}
 $('act').onchange=e=>{act=+e.target.value;draw()};$('op').oninput=e=>{st.opacity=+e.target.value;persist();draw()};$('sg').onchange=$('sp').onchange=draw;
 $('rs').onclick=()=>{const t=T[act];st.templates[t.id].mesh=grid(t.r);persist();draw()};
+$('ro').onclick=()=>{st.outlines=JSON.parse(JSON.stringify(OD));persist();draw()};
 $('ra').onclick=()=>{if(confirm('Reset all meshes and pins?')){st=fresh();persist();ui();draw()}};
 const msg=s=>{$('msg').textContent=s;setTimeout(()=>$('msg').textContent='',3000)};
 $('sv').onclick=()=>{persist();const j=json();$('tx').value=j;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='placements.json';a.click();msg('Saved + downloaded')};
 $('cp').onclick=async()=>{const j=json();$('tx').value=j;try{await navigator.clipboard.writeText(j);msg('Copied!')}catch(e){$('tx').select();document.execCommand('copy');msg('Copied (select fallback)')}};
-function load(s){try{const o=JSON.parse(s);T.forEach(t=>{if(o.templates&&o.templates[t.id])st.templates[t.id]=o.templates[t.id]});if(o.pins)Object.assign(st.pins,o.pins);if(o.opacity!=null)st.opacity=o.opacity;persist();ui();draw();msg('Loaded')}catch(e){msg('Bad JSON: '+e.message)}}
+function load(s){try{const o=JSON.parse(s);T.forEach(t=>{if(o.templates&&o.templates[t.id])st.templates[t.id]=o.templates[t.id]});if(o.head_outline)st.outlines.head_outline=o.head_outline;if(o.body_outline)st.outlines.body_outline=o.body_outline;if(o.pins)Object.assign(st.pins,o.pins);if(o.opacity!=null)st.opacity=o.opacity;persist();ui();draw();msg('Loaded')}catch(e){msg('Bad JSON: '+e.message)}}
 $('ld').onclick=()=>{$('tx').value.trim()?load($('tx').value):$('lf').click()};$('lf').onchange=e=>{const f=e.target.files[0];f&&f.text().then(load)};
 ui();draw();
 </script></body></html>
