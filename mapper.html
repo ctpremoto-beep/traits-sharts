@@ -1,0 +1,47 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width"><title>TRAITS SHARTS Mapper</title><style>
+body{background:#000;color:#fff;font-family:system-ui;margin:0;display:flex;flex-wrap:wrap;gap:12px;padding:12px}
+#wrap{position:relative;width:min(95vw,90vh,800px);aspect-ratio:1;background:repeating-conic-gradient(#555 0 25%,#888 0 50%) 0 0/24px 24px;touch-action:none;user-select:none}
+#wrap img{width:100%;height:100%;display:block;pointer-events:none}
+.box{position:absolute;border:2px solid;box-sizing:border-box;cursor:move}.box span{position:absolute;top:-18px;left:0;font-size:12px;padding:0 3px;color:#000;white-space:nowrap}
+.h{position:absolute;right:-6px;bottom:-6px;width:12px;height:12px;cursor:nwse-resize}
+#panel{min-width:260px}h2{color:#00EC97;margin:4px 0}.r{display:flex;align-items:center;gap:6px;margin:4px 0;padding:3px;border-radius:4px}.r.act{outline:2px solid #00EC97}
+button{background:#00EC97;border:0;padding:6px 10px;margin:3px;border-radius:4px;font-weight:bold;cursor:pointer}textarea{width:100%;height:140px}#live{font-family:monospace;color:#00EC97}
+</style></head><body>
+<div id=wrap><img src=base.png></div>
+<div id=panel><h2>Mapper</h2><a href=index.html style=color:#00EC97>&larr; viewer</a>
+<p>Pick a region, then drag on the image to draw it. Drag a box to move it, or drag its corner to resize.</p>
+<div id=list></div><button id=add>+ Extra region</button>
+<div id=live></div>
+<button id=save>Save</button><button id=copy>Copy JSON</button><button id=reset>Reset to guess</button><br>
+<input type=file id=file accept=.json style=display:none><button id=load>Load JSON</button>
+<textarea id=ta placeholder="JSON appears here; paste JSON here then click Load from text"></textarea><button id=loadt>Load from text</button>
+</div>
+<script>
+const N=1254,W=document.getElementById('wrap'),COL=['#ff4d4d','#00EC97','#ffd24d','#4db8ff','#c84dff','#ff8c1a','#ffffff','#ff66cc','#66ffcc'];
+let R={},act=null,on={};
+const sc=()=>W.clientWidth/N, clamp=v=>Math.max(0,Math.min(N,Math.round(v)));
+function setMap(m){R=JSON.parse(JSON.stringify(m.regions));on={};for(k in R)on[k]=true;act=Object.keys(R)[0];render()}
+function render(){W.querySelectorAll('.box').forEach(b=>b.remove());const L=document.getElementById('list');L.innerHTML='';
+ Object.keys(R).forEach((k,i)=>{const c=COL[i%COL.length],r=R[k];
+  const d=document.createElement('div');d.className='r'+(k==act?' act':'');d.innerHTML=`<input type=checkbox ${on[k]?'checked':''}><span style="width:14px;height:14px;background:${c}"></span><b style="cursor:pointer;flex:1">${k}</b><small>${r?r.w+'x'+r.h:'(draw)'}</small>`;
+  d.querySelector('b').onclick=()=>{act=k;render()};d.querySelector('input').onchange=e=>{on[k]=e.target.checked;render()};L.appendChild(d);
+  if(!r||!on[k])return;const s=sc(),b=document.createElement('div');b.className='box';Object.assign(b.style,{left:r.x*s+'px',top:r.y*s+'px',width:r.w*s+'px',height:r.h*s+'px',borderColor:c,background:c+'22'});
+  b.innerHTML=`<span style="background:${c}">${k}</span><div class=h style="background:${c}"></div>`;
+  b.onpointerdown=e=>{e.stopPropagation();act=k;const rs=e.target.classList.contains('h'),sx=e.clientX,sy=e.clientY,o={...r};
+   const mv=ev=>{const dx=(ev.clientX-sx)/sc(),dy=(ev.clientY-sy)/sc();if(rs){r.w=clamp(Math.max(5,o.w+dx));r.h=clamp(Math.max(5,o.h+dy))}else{r.x=clamp(Math.min(N-r.w,o.x+dx));r.y=clamp(Math.min(N-r.h,o.y+dy))}render()};
+   const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up)};addEventListener('pointermove',mv);addEventListener('pointerup',up)};
+  W.appendChild(b)});
+ const a=R[act];document.getElementById('live').textContent=act+': '+(a?`x=${a.x} y=${a.y} w=${a.w} h=${a.h}`:'not drawn');}
+W.onpointerdown=e=>{if(!act)return;const bb=W.getBoundingClientRect(),x0=(e.clientX-bb.left)/sc(),y0=(e.clientY-bb.top)/sc();on[act]=true;
+ const mv=ev=>{const x1=(ev.clientX-bb.left)/sc(),y1=(ev.clientY-bb.top)/sc();R[act]={x:clamp(Math.min(x0,x1)),y:clamp(Math.min(y0,y1)),w:clamp(Math.abs(x1-x0)),h:clamp(Math.abs(y1-y0))};render()};
+ const up=()=>{removeEventListener('pointermove',mv);removeEventListener('pointerup',up)};addEventListener('pointermove',mv);addEventListener('pointerup',up)};
+const json=()=>JSON.stringify({image:'base.png',width:N,height:N,regions:Object.fromEntries(Object.entries(R).filter(([k,v])=>v&&on[k]))},null,1);
+document.getElementById('save').onclick=()=>{const j=json();localStorage.traits_map=j;document.getElementById('ta').value=j;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='traits_map.json';a.click();alert('Saved. Click Copy JSON and paste it in the chat.')};
+document.getElementById('copy').onclick=()=>{const j=json();document.getElementById('ta').value=j;navigator.clipboard.writeText(j).then(()=>alert('Copied! Paste it in the chat.'),()=>{ta.select();alert('Select-all text box & copy')})};
+document.getElementById('add').onclick=()=>{const n=prompt('Region name (e.g. ears, nose, hand):');if(n){R[n.trim().replace(/\s+/g,'_')]=null;on[n]=true;act=n.trim().replace(/\s+/g,'_');render()}};
+document.getElementById('load').onclick=()=>file.click();file.onchange=()=>file.files[0].text().then(t=>setMap(JSON.parse(t)));
+document.getElementById('loadt').onclick=()=>{try{setMap(JSON.parse(ta.value))}catch(e){alert('Bad JSON')}};
+let G;document.getElementById('reset').onclick=()=>setMap(G);
+fetch('map_guess.json').then(r=>r.json()).then(g=>{G=g;setMap(localStorage.traits_map?JSON.parse(localStorage.traits_map):g)});
+addEventListener('resize',render);
+</script></body></html>
