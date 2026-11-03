@@ -11,7 +11,7 @@ cat > index.html <<H
 body{background:#000;color:#fff;font-family:system-ui;text-align:center}h1{color:#00EC97}
 #s{position:relative;width:min(90vw,640px);aspect-ratio:1;margin:auto;background:repeating-conic-gradient(#777 0 25%,#bbb 0 50%) 0 0/32px 32px;border:2px solid #00EC97}
 #s img{position:absolute;inset:0;width:100%;height:100%}fieldset{display:inline-block;border:1px solid #00EC97;margin:10px;text-align:left}legend{color:#00EC97}label{display:block;margin:6px;font-size:18px}
-</style></head><body><h1>TRAITS SHARTS</h1><p><a href=mapper.html style=color:#00EC97>Open the mapper</a></p><div id=s><img src=base.png>$I</div>$G
+</style></head><body><h1>TRAITS SHARTS</h1><p><a href=cyber.html style=color:#00EC97>Cyberpunk Set</a> · <a href=mapper.html style=color:#00EC97>Open the mapper</a></p><div id=s><img src=base.png>$I</div>$G
 <script>document.querySelectorAll('input').forEach(r=>r.onchange=()=>{document.querySelectorAll('img.'+r.name).forEach(i=>i.style.display=i.id==r.value?'':'none')})</script></body></html>
 H
 [ "$1" = nodeploy ] || { git add -A; git commit -qm update; git push -q origin main; }
