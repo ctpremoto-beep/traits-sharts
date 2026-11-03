@@ -1,8 +1,8 @@
 #!/bin/bash
-# Redeploy: put PNGs named glasses_*.png or hat_*.png in ../traits/, then run ./make.sh  (./make.sh nodeploy = build only)
+# Redeploy: put PNGs named hat_*, face_* or shirt_*.png in ../traits/, then run ./make.sh  (./make.sh nodeploy = build only)
 cd "$(dirname "$0")"; rm -rf traits; mkdir -p traits; cp ../base.png ../preview_all.png .; cp ../traits/*.png traits/
 I=""; G=""
-for grp in glasses:Glasses hat:Hats; do k=${grp%%:*}; t=${grp#*:}
+for grp in shirt:Clothes face:Face hat:Hats; do k=${grp%%:*}; t=${grp#*:}
   G="$G<fieldset><legend>$t</legend><label><input type=radio name=$k value='' checked> None</label>"
   for f in traits/${k}_*.png; do n=$(basename $f .png); G="$G<label><input type=radio name=$k value=$n> ${n#${k}_}</label>"; I="$I<img class=$k id=$n src=$f style=display:none>"; done
   G="$G</fieldset>"; done
