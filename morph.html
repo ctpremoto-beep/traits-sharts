@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><title>Morph / Placement tool</title><style>
+body{background:#000;color:#fff;font-family:system-ui;margin:8px}h1{color:#00EC97;font-size:20px;margin:4px}
+#w{display:flex;flex-wrap:wrap;gap:10px}#c{width:min(96vw,760px);aspect-ratio:1;touch-action:none;border:2px solid #00EC97;background:repeating-conic-gradient(#777 0 25%,#bbb 0 50%) 0 0/32px 32px}
+#p{min-width:260px;flex:1}fieldset{border:1px solid #00EC97;margin:6px 0}legend{color:#00EC97}button{background:#00EC97;color:#000;border:0;padding:8px 10px;margin:3px;border-radius:6px;font-weight:700}
+textarea{width:100%;height:160px;background:#111;color:#0f9;font-size:11px}label{display:block;margin:4px}
+</style></head><body><h1>Morph / Placement tool <small style=color:#aaa>(coordinates in 1254px base pixels)</small></h1>
+<div id=w><canvas id=c width=1254 height=1254></canvas><div id=p>
+<fieldset><legend>Templates (on/off, shape)</legend><div id=tl></div></fieldset>
+<fieldset><legend>Edit</legend><label>Active template <select id=act></select></label>
+<label>Opacity <input type=range id=op min=0 max=1 step=.05 value=.6></label>
+<label><input type=checkbox id=sg checked> Show mesh grid</label><label><input type=checkbox id=sp checked> Show pins</label>
+<button id=rs>Reset active</button><button id=ra>Reset all</button></fieldset>
+<fieldset><legend>Save</legend><button id=sv>Save + download placements.json</button><button id=cp>Copy JSON</button>
+<button id=ld>Load JSON</button><input type=file id=lf accept=.json,application/json hidden><textarea id=tx placeholder="JSON appears here; paste JSON here then Load JSON (or pick a file)"></textarea><div id=msg style=color:#00EC97></div></fieldset>
+<p style=color:#aaa;font-size:13px>Drag the white mesh points to warp the active template; drag the labeled pins to mark spots. Works with mouse and touch.</p></div></div>
+<script>
+const N=5,S=1254,cv=document.getElementById('c'),g=cv.getContext('2d'),$=i=>document.getElementById(i);
+function mk(w,h,f){const c=document.createElement('canvas');c.width=w;c.height=h;f(c.getContext('2d'));return c}
+const hatT=mk(760,430,x=>{x.fillStyle='#00EC97';x.beginPath();x.moveTo(40,400);x.bezierCurveTo(20,60,600,-40,640,330);x.lineTo(750,350);x.quadraticCurveTo(760,410,640,410);x.closePath();x.fill();x.strokeStyle='#000';x.lineWidth=6;x.stroke();x.fillStyle='#000';x.font='bold 60px sans-serif';x.fillText('SAMPLE HAT',150,250)});
+const shirtT=mk(1254,560,x=>{x.fillStyle='#3a7bff';x.beginPath();x.moveTo(0,560);x.lineTo(0,260);x.quadraticCurveTo(80,90,330,40);x.lineTo(560,20);x.quadraticCurveTo(780,160,1000,30);x.lineTo(1120,60);x.quadraticCurveTo(1230,120,1250,260);x.lineTo(1250,560);x.lineTo(1120,560);x.lineTo(1100,420);x.lineTo(1080,560);x.lineTo(180,560);x.lineTo(150,420);x.lineTo(120,560);x.closePath();x.fill();x.strokeStyle='#000';x.lineWidth=6;x.stroke();
+x.fillStyle='#000';x.font='bold 60px sans-serif';x.fillText('SAMPLE SHIRT',420,330);x.font='24px sans-serif';x.fillText('neck hole',700,130);x.fillText('arm',1080,540);x.fillText('arm',110,540)});
+function img(s){const i=new Image();i.src=s;i.onload=draw;return i}
+const T=[{id:'sample_hat',src:hatT,r:[280,0,1040,430],on:true},{id:'sample_shirt',src:shirtT,r:[0,694,1254,1254],on:true},
+{id:'hat_neon_beanie',src:img('samples/hat_neon_beanie.png'),r:[0,0,S,S],on:false},{id:'shirt_techwear_jacket',src:img('samples/shirt_techwear_jacket.png'),r:[0,0,S,S],on:false}];
+const PD={neck_left:[600,800],neck_right:[1000,800],neck_front:[990,760],neck_back:[600,740],shoulder_left:[300,950],shoulder_right:[1080,950],arm_front:[1150,1150],arm_back:[150,1150],necklace_center:[960,1000],chin:[950,770],hat_brim_front:[1020,410],hat_back:[330,370],head_top:[660,40],eye:[870,470]};
+const base=img('base.png');let st,act=0,drag=null;
+function grid(r){const p=[];for(let j=0;j<N;j++)for(let i=0;i<N;i++)p.push([r[0]+(r[2]-r[0])*i/(N-1),r[1]+(r[3]-r[1])*j/(N-1)]);return p}
+function fresh(){return{opacity:.6,templates:Object.fromEntries(T.map(t=>[t.id,{on:t.on,mesh:grid(t.r)}])),pins:JSON.parse(JSON.stringify(PD))}}
+st=JSON.parse(localStorage.getItem('morph_state')||'null')||fresh();
+function sw(t){return t.src.naturalWidth||t.src.width}function sh(t){return t.src.naturalHeight||t.src.height}
+function tri(im,s,d){const[x0,y0]=s[0],[x1,y1]=s[1],[x2,y2]=s[2],D=(x1-x0)*(y2-y0)-(x2-x0)*(y1-y0);if(!D)return;
+ const cx=(d[0][0]+d[1][0]+d[2][0])/3,cy=(d[0][1]+d[1][1]+d[2][1])/3,e=d.map(p=>{const dx=p[0]-cx,dy=p[1]-cy,l=Math.hypot(dx,dy)||1;return[p[0]+dx/l*.8,p[1]+dy/l*.8]});
+ const a=((d[1][0]-d[0][0])*(y2-y0)-(d[2][0]-d[0][0])*(y1-y0))/D,b=((d[1][1]-d[0][1])*(y2-y0)-(d[2][1]-d[0][1])*(y1-y0))/D,
+ c=((d[2][0]-d[0][0])*(x1-x0)-(d[1][0]-d[0][0])*(x2-x0))/D,dd=((d[2][1]-d[0][1])*(x1-x0)-(d[1][1]-d[0][1])*(x2-x0))/D;
+ g.save();g.beginPath();g.moveTo(...e[0]);g.lineTo(...e[1]);g.lineTo(...e[2]);g.closePath();g.clip();
+ g.transform(a,b,c,dd,d[0][0]-a*x0-c*y0,d[0][1]-b*x0-dd*y0);g.drawImage(im,0,0);g.restore()}
+function draw(){g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,S,S);if(base.complete)g.drawImage(base,0,0);
+ T.forEach((t,k)=>{const m=st.templates[t.id];if(!m.on||!sw(t))return;g.globalAlpha=st.opacity;const W=sw(t),H=sh(t),sp=(i,j)=>[W*i/(N-1),H*j/(N-1)],P=(i,j)=>m.mesh[j*N+i];
+  for(let j=0;j<N-1;j++)for(let i=0;i<N-1;i++){tri(t.src,[sp(i,j),sp(i+1,j),sp(i,j+1)],[P(i,j),P(i+1,j),P(i,j+1)]);tri(t.src,[sp(i+1,j),sp(i+1,j+1),sp(i,j+1)],[P(i+1,j),P(i+1,j+1),P(i,j+1)])}
+  g.globalAlpha=1;if($('sg').checked&&k==act){g.strokeStyle='#fff';g.lineWidth=2;for(let j=0;j<N;j++)for(let i=0;i<N;i++){const p=P(i,j);if(i<N-1){g.beginPath();g.moveTo(...p);g.lineTo(...P(i+1,j));g.stroke()}if(j<N-1){g.beginPath();g.moveTo(...p);g.lineTo(...P(i,j+1));g.stroke()}}
+   m.mesh.forEach(p=>{g.fillStyle='#fff';g.beginPath();g.arc(p[0],p[1],11,0,7);g.fill();g.strokeStyle='#000';g.stroke()})}});
+ if($('sp').checked)for(const[n,p]of Object.entries(st.pins)){g.fillStyle='#ff2d6f';g.beginPath();g.arc(p[0],p[1],10,0,7);g.fill();g.strokeStyle='#fff';g.lineWidth=3;g.stroke();
+  g.font='bold 22px sans-serif';g.lineWidth=5;g.strokeStyle='#000';g.strokeText(n,p[0]+13,p[1]-8);g.fillStyle='#fff';g.fillText(n,p[0]+13,p[1]-8)}}
+function pos(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*S/r.width,(e.clientY-r.top)*S/r.height]}
+cv.addEventListener('pointerdown',e=>{const q=pos(e),R=40,d=p=>Math.hypot(p[0]-q[0],p[1]-q[1]);let best=null,bd=R;
+ if($('sp').checked)for(const[n,p]of Object.entries(st.pins))if(d(p)<bd){bd=d(p);best=p}
+ const m=st.templates[T[act].id];if($('sg').checked&&m.on)m.mesh.forEach(p=>{if(d(p)<bd){bd=d(p);best=p}});
+ if(best){drag=best;cv.setPointerCapture(e.pointerId);e.preventDefault()}});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const q=pos(e);drag[0]=Math.round(q[0]);drag[1]=Math.round(q[1]);draw()});
+const up=()=>{if(drag){drag=null;persist()}};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+function persist(){localStorage.setItem('morph_state',JSON.stringify(st))}
+function json(){return JSON.stringify({units:'base pixels (1254x1254)',grid:N+'x'+N+' row-major, top-left first',opacity:st.opacity,templates:st.templates,pins:st.pins},null,1)}
+function ui(){$('tl').innerHTML=T.map(t=>`<label><input type=checkbox data-t=${t.id} ${st.templates[t.id].on?'checked':''}> ${t.id}</label>`).join('');
+ $('act').innerHTML=T.map((t,i)=>`<option value=${i}>${t.id}</option>`).join('');$('act').value=act;$('op').value=st.opacity;
+ document.querySelectorAll('[data-t]').forEach(c=>c.onchange=()=>{st.templates[c.dataset.t].on=c.checked;persist();draw()})}
+$('act').onchange=e=>{act=+e.target.value;draw()};$('op').oninput=e=>{st.opacity=+e.target.value;persist();draw()};$('sg').onchange=$('sp').onchange=draw;
+$('rs').onclick=()=>{const t=T[act];st.templates[t.id].mesh=grid(t.r);persist();draw()};
+$('ra').onclick=()=>{if(confirm('Reset all meshes and pins?')){st=fresh();persist();ui();draw()}};
+const msg=s=>{$('msg').textContent=s;setTimeout(()=>$('msg').textContent='',3000)};
+$('sv').onclick=()=>{persist();const j=json();$('tx').value=j;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([j],{type:'application/json'}));a.download='placements.json';a.click();msg('Saved + downloaded')};
+$('cp').onclick=async()=>{const j=json();$('tx').value=j;try{await navigator.clipboard.writeText(j);msg('Copied!')}catch(e){$('tx').select();document.execCommand('copy');msg('Copied (select fallback)')}};
+function load(s){try{const o=JSON.parse(s);T.forEach(t=>{if(o.templates&&o.templates[t.id])st.templates[t.id]=o.templates[t.id]});if(o.pins)Object.assign(st.pins,o.pins);if(o.opacity!=null)st.opacity=o.opacity;persist();ui();draw();msg('Loaded')}catch(e){msg('Bad JSON: '+e.message)}}
+$('ld').onclick=()=>{$('tx').value.trim()?load($('tx').value):$('lf').click()};$('lf').onchange=e=>{const f=e.target.files[0];f&&f.text().then(load)};
+ui();draw();
+</script></body></html>
