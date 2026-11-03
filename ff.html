@@ -1,0 +1,9 @@
+<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width"><title>Final Fantasy Set</title><style>
+body{background:#000;color:#fff;font-family:system-ui;text-align:center}h1{color:#00EC97}
+#s{position:relative;width:min(90vw,640px);aspect-ratio:1;margin:auto;border:2px solid #00EC97;background:#000}
+#s.chk{background:repeating-conic-gradient(#777 0 25%,#bbb 0 50%) 0 0/32px 32px}
+#s img{position:absolute;inset:0;width:100%;height:100%}label{display:inline-block;margin:10px;font-size:20px}a{color:#00EC97}
+</style></head><body><h1>CYBERPUNK FINAL FANTASY SET</h1><div id=s><img src=base.png><img id=shirt src=ff/set_ff_shirt.png><img id=hat src=ff/set_ff_hat.png><img id=glasses src=ff/set_ff_glasses.png></div>
+<label><input type=checkbox data-t=shirt checked> Shirt</label><label><input type=checkbox data-t=hat checked> Hat</label><label><input type=checkbox data-t=glasses checked> Glasses</label><label><input type=checkbox id=bg> Checker bg</label>
+<p><a href=index.html>All traits</a> · <a href=cyber.html>Cyberpunk Set</a></p>
+<script>document.querySelectorAll('[data-t]').forEach(c=>c.onchange=()=>document.getElementById(c.dataset.t).style.display=c.checked?'':'none');bg.onchange=()=>s.classList.toggle('chk',bg.checked)</script></body></html>
